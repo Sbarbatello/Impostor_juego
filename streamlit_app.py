@@ -1,9 +1,10 @@
 import streamlit as st
 import random
 
-st.set_page_config(page_title="Juego del Impostor", layout="centered")
+# Configuración de página para móviles y escritorio
+st.set_page_config(page_title="Impostor Game", layout="wide")
 
-# Inicializar el estado global del juego
+# Inicialización segura del estado del juego
 if 'roles' not in st.session_state:
     st.session_state.roles = []
 if 'activo' not in st.session_state:
@@ -11,46 +12,64 @@ if 'activo' not in st.session_state:
 
 st.title("🕵️ Juego del Impostor")
 
-# --- PANEL DE CONTROL (MASTER) ---
-with st.expander("⚙️ Configuración del Master", expanded=not st.session_state.activo):
-    num_jugadores = st.number_input("Número de jugadores", min_value=3, max_value=20, value=5)
-    palabra_secreta = st.text_input("Palabra secreta", placeholder="Ej: Sushi")
+# --- ZONA DEL MASTER ---
+with st.sidebar:
+    st.header("⚙️ Panel de Control")
+    password = st.text_input("Contraseña Master (para ocultar ajustes)", type="password")
     
-    if st.button("🚀 GENERAR JUEGO NUEVO"):
-        if palabra_secreta:
-            # Crear y mezclar roles
-            lista_roles = [palabra_secreta] * (num_jugadores - 1)
-            lista_roles.append("🚨 ¡ERES EL IMPOSTOR!")
-            random.shuffle(lista_roles)
-            
-            st.session_state.roles = lista_roles
-            st.session_state.activo = True
-            st.success(f"¡Juego listo con {num_jugadores} pestañas!")
-        else:
-            st.error("Escribe una palabra primero.")
+    # Solo mostramos los controles si la contraseña es correcta (ej: '1234' o la que quieras)
+    # Si no quieres contraseña, puedes quitar este 'if'
+    if password == "admin": 
+        num_jugadores = st.number_input("Número de jugadores", min_value=3, max_value=20, value=5)
+        palabra_secreta = st.text_input("Palabra para el grupo")
+        
+        if st.button("🚀 INICIAR / REINICIAR JUEGO"):
+            if palabra_secreta:
+                # 1. Crear la lista de roles
+                total = int(num_jugadores)
+                roles = [palabra_secreta] * (total - 1)
+                roles.append("🚨 ¡ERES EL IMPOSTOR!")
+                
+                # 2. Mezclar aleatoriamente
+                random.shuffle(roles)
+                
+                # 3. Guardar en sesión
+                st.session_state.roles = roles
+                st.session_state.activo = True
+                st.success("Juego generado con éxito")
+                st.rerun()
+            else:
+                st.error("Introduce una palabra")
+    else:
+        st.warning("Introduce la contraseña 'admin' para configurar.")
 
-st.divider() # Esta es la forma correcta de hacer la línea en Streamlit
-
-# --- GENERACIÓN DINÁMICA DE PESTAÑAS ---
+# --- ZONA DE JUEGO (DASHBOARD) ---
 if st.session_state.activo:
-    # Creamos una lista de nombres para las pestañas
-    nombres_pestanas = [f"Jugador {i+1}" for i in range(len(st.session_state.roles))]
+    st.info("¡La partida está en curso! Que cada jugador busque su pestaña.")
     
-    # Generamos las pestañas dinámicamente
-    tabs = st.tabs(nombres_pestanas)
-    
+    # Generación dinámica de pestañas según el número de roles creados
+    titulos_tabs = [f"Jugador {i+1}" for i in range(len(st.session_state.roles))]
+    tabs = st.tabs(titulos_tabs)
+
     for i, tab in enumerate(tabs):
         with tab:
-            st.write("### Toca el botón para ver tu palabra")
-            # Usamos un checkbox o expander para que la palabra no sea visible de inmediato
-            if st.checkbox(f"Revelar rol - Pestaña {i+1}", key=f"check_{i}"):
-                st.info(f"Tu palabra es:")
-                st.header(st.session_state.roles[i])
+            st.subheader(f"Espacio del Jugador {i+1}")
+            st.write("Asegúrate de que nadie esté mirando tu pantalla.")
+            
+            # Checkbox para ocultar/mostrar la palabra y que no se filtre al cambiar de pestaña
+            revelar = st.checkbox("Revelar mi palabra secreta", key=f"tab_{i}")
+            
+            if revelar:
+                st.divider()
+                # Mostramos la palabra con un estilo llamativo
+                st.markdown(f"### Tu palabra es:\n# {st.session_state.roles[i]}")
+                st.divider()
             else:
-                st.write("*(Oculto)*")
+                st.write("---")
+                st.write("Haz click en el checkbox para ver tu rol.")
 
-    if st.button("Reiniciar Partida"):
-        st.session_state.activo = False
-        st.rerun()
 else:
-    st.info("Esperando a que el Master configure la partida...")
+    st.info("Esperando a que el Master configure la partida en la barra lateral.")
+
+# Pie de página simple
+st.markdown("<br><br><small>Refresca la página si necesitas reiniciar la vista.</small>", unsafe_allow_html=True)
