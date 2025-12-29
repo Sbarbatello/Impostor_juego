@@ -19,7 +19,7 @@ def obtener_servidor():
 datos = obtener_servidor()
 
 st.title("🕵️ El Impostor")
-st.write(f"🟢 Ronda: {datos['version']} | Rondas de enfriamiento: {datos['rondas_desde_multi']}/7")
+st.write(f"🟢 Ronda: {datos['version']}")
 
 # --- PANEL DE CONTROL ---
 with st.expander("⚙️ CONFIGURACIÓN DEL MASTER", expanded=not datos['activo']):
