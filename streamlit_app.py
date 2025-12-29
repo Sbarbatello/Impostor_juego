@@ -2,8 +2,7 @@ import streamlit as st
 import random
 import time
 
-# Configuración de página
-st.set_page_config(page_title="Impostor - Ordenado", layout="wide")
+st.set_page_config(page_title="Impostor Pro", layout="wide")
 
 # --- MEMORIA GLOBAL (SERVIDOR) ---
 @st.cache_resource
@@ -12,80 +11,82 @@ def obtener_servidor():
         "roles": [], 
         "nombres": [],
         "activo": False, 
-        "version": 0, 
-        "ultima_actualizacion": time.time()
+        "version": 0,  # Este es el contador de rondas
     }
 
 datos = obtener_servidor()
 
-st.write(f"🟢 Estado: Conectado (Ronda {datos['version']})")
+# --- INTERFAZ ---
+st.write(f"🟢 Partida: {'Activa' if datos['activo'] else 'Esperando'} | Ronda: {datos['version']}")
 st.title("🕵️ El Impostor")
 
 # --- PANEL DE CONTROL ---
-with st.expander("🎮 CONFIGURACIÓN DE PARTIDA", expanded=not datos["activo"]):
-    num_jugadores = st.number_input("Nº de Jugadores", 3, 20, 5)
+with st.expander("🎮 PANEL DEL MASTER", expanded=True):
     
-    st.write("### Nombres de los jugadores:")
-    nombres_temporales = []
-    
-    # Eliminamos las columnas aquí para que en el móvil el orden sea 1, 2, 3...
-    # Esto garantiza que el orden visual sea siempre el mismo que el de las pestañas.
-    for i in range(num_jugadores):
-        nombre = st.text_input(f"Nombre Jugador {i+1}", value=f"Jugador {i+1}", key=f"input_name_{i}")
-        nombres_temporales.append(nombre)
-    
+    # 1. Sección de Jugadores (Cerrada por defecto)
+    with st.expander("👥 CONFIGURAR JUGADORES", expanded=False):
+        num_jugadores = st.number_input("Nº de Jugadores", 3, 20, 5)
+        st.write("### Edición de Nombres:")
+        nombres_temporales = []
+        for i in range(num_jugadores):
+            n = st.text_input(f"Jugador {i+1}", value=f"Jugador {i+1}", key=f"input_{i}")
+            nombres_temporales.append(n)
+
     st.divider()
-    palabra = st.text_input("Palabra Secreta", placeholder="Ej: Pizza")
     
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("🚀 GENERAR JUEGO"):
+    # 2. Configuración de Ronda
+    palabra = st.text_input("Palabra Secreta para esta ronda")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🚀 SIGUIENTE RONDA (Nueva Palabra)"):
             if palabra:
-                # 1. Crear y mezclar roles
+                # Generar y mezclar
                 lista_roles = [palabra] * (int(num_jugadores) - 1)
                 lista_roles.append("🚨 ¡ERES EL IMPOSTOR!")
                 random.shuffle(lista_roles)
                 
-                # 2. Guardar todo en el servidor (Global)
+                # Actualizar datos globales
                 datos["roles"] = lista_roles
                 datos["nombres"] = nombres_temporales
                 datos["activo"] = True
-                datos["version"] += 1
-                datos["ultima_actualizacion"] = time.time()
+                datos["version"] += 1 # Aumenta la ronda y limpia checkboxes
+                st.success(f"¡Ronda {datos['version']} generada!")
                 st.rerun()
             else:
-                st.error("Falta la palabra secreta")
-    
-    with c2:
-        if st.button("🗑️ RESETEAR"):
+                st.error("Introduce la palabra secreta")
+
+    with col2:
+        if st.button("🧹 RESET TOTAL (Nueva Partida)"):
             datos["activo"] = False
+            datos["roles"] = []
+            datos["nombres"] = []
+            datos["version"] = 0 # Resetea el contador
+            st.warning("Juego reseteado desde cero.")
             st.rerun()
 
 st.divider()
 
 # --- VISTA DE JUGADOR ---
 if datos["activo"]:
-    st.subheader(f"📍 Partida en curso (Ronda #{datos['version']})")
+    st.subheader(f"📍 Ronda actual: {datos['version']}")
     
-    # Generar pestañas con los nombres guardados
     tabs = st.tabs(datos["nombres"])
     
     for i, tab in enumerate(tabs):
         with tab:
-            st.subheader(f"Espacio de: {datos['nombres'][i]}")
-            # El checkbox se resetea con la versión
-            if st.checkbox(f"Soy {datos['nombres'][i]} (Ver rol)", key=f"v{datos['version']}_p{i}"):
+            st.write(f"### Hola, {datos['nombres'][i]}")
+            # La key ligada a la versión hace que al cambiar de ronda, se desmarque solo
+            if st.checkbox(f"Ver mi palabra", key=f"ronda_{datos['version']}_j_{i}"):
                 st.markdown(f"""
                 <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border: 2px solid #FF4B4B; text-align: center;">
-                    <p style="color: grey; margin-bottom: 5px;">Tu palabra es:</p>
-                    <h1 style="color: #FF4B4B; margin-top: 0;">{datos['roles'][i]}</h1>
+                    <h1 style="color: #FF4B4B;">{datos['roles'][i]}</h1>
                 </div>
                 """, unsafe_allow_html=True)
-            else:
-                st.write("Haz click para revelar.")
 else:
-    st.info("Esperando a que el Master configure la partida...")
+    st.info("El Master debe configurar los jugadores y la palabra para empezar.")
 
-# Autorefresco cada 3 segundos para sincronizar móviles
+# Autorefresco cada 3 segundos
 time.sleep(3)
 st.rerun()
