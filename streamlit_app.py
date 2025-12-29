@@ -1,69 +1,75 @@
 import streamlit as st
 import random
+import time
 
-st.set_page_config(page_title="Impostor Multi-Dispositivo", layout="wide")
+# Configuración de página
+st.set_page_config(page_title="Impostor Sincronizado", layout="wide")
 
-# --- FUNCIÓN PARA COMPARTIR DATOS ENTRE TODOS ---
-# Esto hace que los datos vivan en el servidor, no en el móvil de cada uno
+# --- MEMORIA GLOBAL (SERVIDOR) ---
+# Esto es lo que comparten todos los móviles que entren a la URL
 @st.cache_resource
-def get_global_game_data():
-    return {
-        "roles": [],
-        "activo": False,
-        "id_partida": 0
-    }
+def obtener_servidor():
+    return {"roles": [], "activo": False, "version": 0, "ultima_actualizacion": time.time()}
 
-game_data = get_global_game_data()
+datos = obtener_servidor()
 
-st.title("🕵️ Impostor Multi-Jugador")
+# --- AUTOREFRESCO ---
+# Esto hace que la app se actualice sola cada 3 segundos para ver si hay cambios
+st.empty() 
+st.write(f"🟢 Estado: Conectado (Versión {datos['version']})")
 
-# --- PANEL DEL MASTER ---
-with st.sidebar:
-    st.header("⚙️ Configuración")
-    password = st.text_input("Contraseña Master", type="password")
+st.title("🕵️ El Impostor")
+
+# --- PANEL DE CONTROL (Cualquiera puede ser Master) ---
+with st.expander("🎮 PANEL DE CONTROL", expanded=not datos["activo"]):
+    num_jugadores = st.number_input("Nº de Jugadores", 3, 20, 5)
+    palabra = st.text_input("Palabra Secreta", placeholder="Ej: Pizza")
     
-    if password == "admin":
-        num_jugadores = st.number_input("Jugadores", min_value=3, max_value=20, value=5)
-        palabra = st.text_input("Palabra secreta")
-        
-        if st.button("🚀 LANZAR JUEGO PARA TODOS"):
-            # Generar roles
-            roles = [palabra] * (int(num_jugadores) - 1)
-            roles.append("🚨 ¡ERES EL IMPOSTOR!")
-            random.shuffle(roles)
-            
-            # Actualizar el diccionario GLOBAL
-            game_data["roles"] = roles
-            game_data["activo"] = True
-            game_data["id_partida"] += 1 # Forzamos refresco
-            st.success("¡Juego enviado a todos los móviles!")
-            st.rerun()
-            
-        if st.button("🗑️ Resetear"):
-            game_data["activo"] = False
-            game_data["roles"] = []
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("🚀 GENERAR JUEGO NUEVO"):
+            if palabra:
+                # Crear y mezclar roles
+                lista = [palabra] * (int(num_jugadores) - 1)
+                lista.append("🚨 ¡ERES EL IMPOSTOR!")
+                random.shuffle(lista)
+                
+                # Guardar en el servidor para todos
+                datos["roles"] = lista
+                datos["activo"] = True
+                datos["version"] += 1
+                datos["ultima_actualizacion"] = time.time()
+                st.rerun()
+            else:
+                st.error("Escribe una palabra")
+    
+    with c2:
+        if st.button("🗑️ RESETEAR"):
+            datos["activo"] = False
+            datos["roles"] = []
+            datos["version"] += 1
             st.rerun()
 
-# --- VISTA DEL JUGADOR ---
-if game_data["activo"]:
-    st.info(f"Partida en curso. Por favor, selecciona tu número de jugador.")
+st.divider()
+
+# --- VISTA DE JUGADOR ---
+if datos["activo"]:
+    st.subheader(f"📍 Partida en curso (Ronda #{datos['version']})")
     
-    # IMPORTANTE: En móviles, las pestañas (tabs) pueden ser difíciles de navegar 
-    # si hay muchas. Usamos un selector mejorado.
-    titulos = [f"Jugador {i+1}" for i in range(len(game_data["roles"]))]
+    # Generar pestañas dinámicas
+    titulos = [f"Jugador {i+1}" for i in range(len(datos["roles"]))]
     tabs = st.tabs(titulos)
     
     for i, tab in enumerate(tabs):
         with tab:
-            st.write(f"### Pestaña {i+1}")
-            # El checkbox asegura que no vean la palabra de otros por error al navegar
-            if st.checkbox("Revelar mi rol", key=f"global_tab_{i}_{game_data['id_partida']}"):
-                st.divider()
-                st.markdown(f"<h1 style='text-align: center;'>{game_data['roles'][i]}</h1>", unsafe_allow_html=True)
-                st.divider()
+            # La key usa la versión para resetear los checkboxes automáticamente
+            if st.checkbox(f"Soy el Jugador {i+1} (Revelar)", key=f"v{datos['version']}_p{i}"):
+                st.markdown(f"<h1 style='text-align: center;'>{datos['roles'][i]}</h1>", unsafe_allow_html=True)
+            else:
+                st.write("Haz click para ver tu palabra secreta.")
 else:
-    st.warning("Esperando a que el Master inicie la partida...")
-    if st.button("🔄 Comprobar si ya empezó"):
-        st.rerun()
+    st.info("Esperando a que alguien configure la partida...")
 
-st.caption("Nota: Si el Master ya inició el juego y no ves nada, pulsa el botón 'Comprobar'.")
+# Lógica de autorefresco: la app se recarga cada 3 segundos
+time.sleep(3)
+st.rerun()
