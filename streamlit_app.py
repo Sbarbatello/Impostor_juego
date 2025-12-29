@@ -3,73 +3,85 @@ import random
 import time
 
 # Configuración de página
-st.set_page_config(page_title="Impostor Sincronizado", layout="wide")
+st.set_page_config(page_title="Impostor con Nombres", layout="wide")
 
 # --- MEMORIA GLOBAL (SERVIDOR) ---
-# Esto es lo que comparten todos los móviles que entren a la URL
 @st.cache_resource
 def obtener_servidor():
-    return {"roles": [], "activo": False, "version": 0, "ultima_actualizacion": time.time()}
+    return {
+        "roles": [], 
+        "nombres": [],
+        "activo": False, 
+        "version": 0, 
+        "ultima_actualizacion": time.time()
+    }
 
 datos = obtener_servidor()
 
-# --- AUTOREFRESCO ---
-# Esto hace que la app se actualice sola cada 3 segundos para ver si hay cambios
-st.empty() 
-st.write(f"🟢 Estado: Conectado (Versión {datos['version']})")
-
+st.write(f"🟢 Estado: Conectado (Ronda {datos['version']})")
 st.title("🕵️ El Impostor")
 
-# --- PANEL DE CONTROL (Cualquiera puede ser Master) ---
-with st.expander("🎮 PANEL DE CONTROL", expanded=not datos["activo"]):
+# --- PANEL DE CONTROL ---
+with st.expander("🎮 CONFIGURACIÓN DE PARTIDA", expanded=not datos["activo"]):
     num_jugadores = st.number_input("Nº de Jugadores", 3, 20, 5)
-    palabra = st.text_input("Palabra Secreta", placeholder="Ej: Pizza")
+    
+    # NUEVO: Campo para nombres personalizados
+    nombres_input = st.text_input("Nombres de los jugadores (separados por comas)", 
+                                 placeholder="Ej: Juan, Maria, Pedro...")
+    
+    palabra = st.text_input("Palabra Secreta")
     
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("🚀 GENERAR JUEGO NUEVO"):
+        if st.button("🚀 GENERAR JUEGO"):
             if palabra:
-                # Crear y mezclar roles
-                lista = [palabra] * (int(num_jugadores) - 1)
-                lista.append("🚨 ¡ERES EL IMPOSTOR!")
-                random.shuffle(lista)
+                # 1. Gestionar nombres
+                if nombres_input:
+                    # Limpiamos espacios y creamos lista
+                    lista_nombres = [n.strip() for n in nombres_input.split(",")]
+                    # Si faltan nombres, rellenamos con "Jugador X"
+                    while len(lista_nombres) < num_jugadores:
+                        lista_nombres.append(f"Jugador {len(lista_nombres)+1}")
+                else:
+                    lista_nombres = [f"Jugador {i+1}" for i in range(num_jugadores)]
                 
-                # Guardar en el servidor para todos
-                datos["roles"] = lista
+                # 2. Crear y mezclar roles
+                lista_roles = [palabra] * (int(num_jugadores) - 1)
+                lista_roles.append("🚨 ¡ERES EL IMPOSTOR!")
+                random.shuffle(lista_roles)
+                
+                # 3. Guardar todo en el servidor (Global)
+                datos["roles"] = lista_roles[:int(num_jugadores)] # Ajustar al número real
+                datos["nombres"] = lista_nombres[:int(num_jugadores)]
                 datos["activo"] = True
                 datos["version"] += 1
                 datos["ultima_actualizacion"] = time.time()
                 st.rerun()
             else:
-                st.error("Escribe una palabra")
+                st.error("Falta la palabra secreta")
     
     with c2:
         if st.button("🗑️ RESETEAR"):
             datos["activo"] = False
-            datos["roles"] = []
-            datos["version"] += 1
             st.rerun()
 
 st.divider()
 
 # --- VISTA DE JUGADOR ---
 if datos["activo"]:
-    st.subheader(f"📍 Partida en curso (Ronda #{datos['version']})")
-    
-    # Generar pestañas dinámicas
-    titulos = [f"Jugador {i+1}" for i in range(len(datos["roles"]))]
-    tabs = st.tabs(titulos)
+    # Usamos los nombres personalizados para las pestañas
+    tabs = st.tabs(datos["nombres"])
     
     for i, tab in enumerate(tabs):
         with tab:
-            # La key usa la versión para resetear los checkboxes automáticamente
-            if st.checkbox(f"Soy el Jugador {i+1} (Revelar)", key=f"v{datos['version']}_p{i}"):
+            st.subheader(f"Espacio de: {datos['nombres'][i]}")
+            if st.checkbox(f"Revelar mi rol", key=f"v{datos['version']}_p{i}"):
                 st.markdown(f"<h1 style='text-align: center;'>{datos['roles'][i]}</h1>", unsafe_allow_html=True)
             else:
-                st.write("Haz click para ver tu palabra secreta.")
+                st.write("Haz click para ver tu palabra.")
 else:
-    st.info("Esperando a que alguien configure la partida...")
+    st.info("Esperando a que el Master configure la partida...")
 
-# Lógica de autorefresco: la app se recarga cada 3 segundos
+# Autorefresco cada 3 segundos
 time.sleep(3)
 st.rerun()
