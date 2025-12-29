@@ -18,7 +18,7 @@ def obtener_servidor():
 
 datos = obtener_servidor()
 
-st.title("🕵️ El Impostor")
+st.title("🕵️ El JIKmpostor")
 st.write(f"🟢 Ronda: {datos['version']}")
 
 # --- PANEL DE CONTROL ---
