@@ -3,7 +3,7 @@ import random
 import time
 
 # Configuración de página
-st.set_page_config(page_title="Impostor - Nombres Individuales", layout="wide")
+st.set_page_config(page_title="Impostor - Ordenado", layout="wide")
 
 # --- MEMORIA GLOBAL (SERVIDOR) ---
 @st.cache_resource
@@ -25,17 +25,14 @@ st.title("🕵️ El Impostor")
 with st.expander("🎮 CONFIGURACIÓN DE PARTIDA", expanded=not datos["activo"]):
     num_jugadores = st.number_input("Nº de Jugadores", 3, 20, 5)
     
-    # Creamos campos de texto dinámicos para los nombres
     st.write("### Nombres de los jugadores:")
     nombres_temporales = []
     
-    # Creamos columnas para que los campos de nombre no ocupen tanto espacio hacia abajo
-    cols = st.columns(2) 
+    # Eliminamos las columnas aquí para que en el móvil el orden sea 1, 2, 3...
+    # Esto garantiza que el orden visual sea siempre el mismo que el de las pestañas.
     for i in range(num_jugadores):
-        # Repartimos los inputs en las dos columnas
-        with cols[i % 2]:
-            nombre = st.text_input(f"Jugador {i+1}", value=f"Jugador {i+1}", key=f"input_name_{i}")
-            nombres_temporales.append(nombre)
+        nombre = st.text_input(f"Nombre Jugador {i+1}", value=f"Jugador {i+1}", key=f"input_name_{i}")
+        nombres_temporales.append(nombre)
     
     st.divider()
     palabra = st.text_input("Palabra Secreta", placeholder="Ej: Pizza")
@@ -76,9 +73,14 @@ if datos["activo"]:
     for i, tab in enumerate(tabs):
         with tab:
             st.subheader(f"Espacio de: {datos['nombres'][i]}")
-            # Usamos la versión en la key para que el checkbox se resetee en cada ronda
+            # El checkbox se resetea con la versión
             if st.checkbox(f"Soy {datos['nombres'][i]} (Ver rol)", key=f"v{datos['version']}_p{i}"):
-                st.markdown(f"<h1 style='text-align: center; color: #FF4B4B;'>{datos['roles'][i]}</h1>", unsafe_allow_html=True)
+                st.markdown(f"""
+                <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border: 2px solid #FF4B4B; text-align: center;">
+                    <p style="color: grey; margin-bottom: 5px;">Tu palabra es:</p>
+                    <h1 style="color: #FF4B4B; margin-top: 0;">{datos['roles'][i]}</h1>
+                </div>
+                """, unsafe_allow_html=True)
             else:
                 st.write("Haz click para revelar.")
 else:
