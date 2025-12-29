@@ -1,75 +1,69 @@
 import streamlit as st
 import random
 
-# Configuración de página para móviles y escritorio
-st.set_page_config(page_title="Impostor Game", layout="wide")
+st.set_page_config(page_title="Impostor Multi-Dispositivo", layout="wide")
 
-# Inicialización segura del estado del juego
-if 'roles' not in st.session_state:
-    st.session_state.roles = []
-if 'activo' not in st.session_state:
-    st.session_state.activo = False
+# --- FUNCIÓN PARA COMPARTIR DATOS ENTRE TODOS ---
+# Esto hace que los datos vivan en el servidor, no en el móvil de cada uno
+@st.cache_resource
+def get_global_game_data():
+    return {
+        "roles": [],
+        "activo": False,
+        "id_partida": 0
+    }
 
-st.title("🕵️ Juego del Impostor")
+game_data = get_global_game_data()
 
-# --- ZONA DEL MASTER ---
+st.title("🕵️ Impostor Multi-Jugador")
+
+# --- PANEL DEL MASTER ---
 with st.sidebar:
-    st.header("⚙️ Panel de Control")
-    password = st.text_input("Contraseña Master (para ocultar ajustes)", type="password")
+    st.header("⚙️ Configuración")
+    password = st.text_input("Contraseña Master", type="password")
     
-    # Solo mostramos los controles si la contraseña es correcta (ej: '1234' o la que quieras)
-    # Si no quieres contraseña, puedes quitar este 'if'
-    if password == "admin": 
-        num_jugadores = st.number_input("Número de jugadores", min_value=3, max_value=20, value=5)
-        palabra_secreta = st.text_input("Palabra para el grupo")
+    if password == "admin":
+        num_jugadores = st.number_input("Jugadores", min_value=3, max_value=20, value=5)
+        palabra = st.text_input("Palabra secreta")
         
-        if st.button("🚀 INICIAR / REINICIAR JUEGO"):
-            if palabra_secreta:
-                # 1. Crear la lista de roles
-                total = int(num_jugadores)
-                roles = [palabra_secreta] * (total - 1)
-                roles.append("🚨 ¡ERES EL IMPOSTOR!")
-                
-                # 2. Mezclar aleatoriamente
-                random.shuffle(roles)
-                
-                # 3. Guardar en sesión
-                st.session_state.roles = roles
-                st.session_state.activo = True
-                st.success("Juego generado con éxito")
-                st.rerun()
-            else:
-                st.error("Introduce una palabra")
-    else:
-        st.warning("Introduce la contraseña 'admin' para configurar.")
+        if st.button("🚀 LANZAR JUEGO PARA TODOS"):
+            # Generar roles
+            roles = [palabra] * (int(num_jugadores) - 1)
+            roles.append("🚨 ¡ERES EL IMPOSTOR!")
+            random.shuffle(roles)
+            
+            # Actualizar el diccionario GLOBAL
+            game_data["roles"] = roles
+            game_data["activo"] = True
+            game_data["id_partida"] += 1 # Forzamos refresco
+            st.success("¡Juego enviado a todos los móviles!")
+            st.rerun()
+            
+        if st.button("🗑️ Resetear"):
+            game_data["activo"] = False
+            game_data["roles"] = []
+            st.rerun()
 
-# --- ZONA DE JUEGO (DASHBOARD) ---
-if st.session_state.activo:
-    st.info("¡La partida está en curso! Que cada jugador busque su pestaña.")
+# --- VISTA DEL JUGADOR ---
+if game_data["activo"]:
+    st.info(f"Partida en curso. Por favor, selecciona tu número de jugador.")
     
-    # Generación dinámica de pestañas según el número de roles creados
-    titulos_tabs = [f"Jugador {i+1}" for i in range(len(st.session_state.roles))]
-    tabs = st.tabs(titulos_tabs)
-
+    # IMPORTANTE: En móviles, las pestañas (tabs) pueden ser difíciles de navegar 
+    # si hay muchas. Usamos un selector mejorado.
+    titulos = [f"Jugador {i+1}" for i in range(len(game_data["roles"]))]
+    tabs = st.tabs(titulos)
+    
     for i, tab in enumerate(tabs):
         with tab:
-            st.subheader(f"Espacio del Jugador {i+1}")
-            st.write("Asegúrate de que nadie esté mirando tu pantalla.")
-            
-            # Checkbox para ocultar/mostrar la palabra y que no se filtre al cambiar de pestaña
-            revelar = st.checkbox("Revelar mi palabra secreta", key=f"tab_{i}")
-            
-            if revelar:
+            st.write(f"### Pestaña {i+1}")
+            # El checkbox asegura que no vean la palabra de otros por error al navegar
+            if st.checkbox("Revelar mi rol", key=f"global_tab_{i}_{game_data['id_partida']}"):
                 st.divider()
-                # Mostramos la palabra con un estilo llamativo
-                st.markdown(f"### Tu palabra es:\n# {st.session_state.roles[i]}")
+                st.markdown(f"<h1 style='text-align: center;'>{game_data['roles'][i]}</h1>", unsafe_allow_html=True)
                 st.divider()
-            else:
-                st.write("---")
-                st.write("Haz click en el checkbox para ver tu rol.")
-
 else:
-    st.info("Esperando a que el Master configure la partida en la barra lateral.")
+    st.warning("Esperando a que el Master inicie la partida...")
+    if st.button("🔄 Comprobar si ya empezó"):
+        st.rerun()
 
-# Pie de página simple
-st.markdown("<br><br><small>Refresca la página si necesitas reiniciar la vista.</small>", unsafe_allow_html=True)
+st.caption("Nota: Si el Master ya inició el juego y no ves nada, pulsa el botón 'Comprobar'.")
